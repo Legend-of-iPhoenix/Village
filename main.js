@@ -31,7 +31,7 @@ Note: this errors, because Edsger is male and prefers the use of "his".
 Tell Edsger to write the text "example" on her scroll.
 
 Note: If you think I'm being an jerk because of this, 
-Note: check the comment on line 79 in main.js.
+Note: check the comment here: https://github.com/Legend-of-iPhoenix/Village/blob/a8d53ad79a76b9bb129c75165c4a5ad67179e25d/main.js#L89
 */
 
 window.onload = function () {
