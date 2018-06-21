@@ -8,8 +8,12 @@
   <meta name="keywords" content="_iPhoenix_, iPhoenix, Village, Programming Language, esotistic programming language.">
   <meta name="author" content="_iPhoenix_">
 	<script src="main.js"></script>
+	<link href="https://fonts.googleapis.com/css?family=Anonymous+Pro" rel="stylesheet">
 	<style>
-		div {
+		* {
+			font-family: 'Anonymous Pro', monospace;
+		}
+		div.main {
 			width: 100%;
 			padding: 0;
 			margin: 0;
@@ -18,7 +22,7 @@
 			display: flex;
 			justify-content: center;
 		}
-		div * {
+		div.main * {
 			box-sizing: border-box;
 			flex: 1;
 			margin: 0;
@@ -43,18 +47,22 @@
 	</style>
 </head>
 <body>
-	<div style="height: 10vh;">
+	<div class="main" style="height: 10vh;">
 		<h2 style="flex: 2;">Commands</h2>
 		<h2>Community Message Board</h2>
-		<h2>Console</h2>
+		<h2 id="consoleHeader">Console</h2>
 	</div>
-	<div>
+	<div class="main">
 		<span id='code' style="overflow-y: scroll; flex: 2; display: flex; ">
-			<textarea id="lineNumbers" readonly="true" style="resize: none; flex: 1; float: left; overflow: hidden;" cols="1" rows="2">1<br>2</textarea>
+			<textarea id="lineNumbers" readonly="true" style="resize: none; flex: 1; float: left; overflow: hidden;" cols="1" rows="2">1</textarea>
 		<textarea id="input" style="float: left; overflow-y: visible; overflow-x: visible; overflow-x: scroll; white-space: nowrap; flex: 10;"></textarea>
 		</span>
 		<textarea disabled=true id="messageBoard"></textarea>
 		<textarea disabled=true id='console'></textarea>
 	</div>
-	<button onclick="parse()">Run</button>
+	<button onclick="run()">Run</button>
+	<div>
+		<p>Settings</p>
+		<label for="showConsole">Enable debug mode.</label>
+		<input type="checkbox" id="showConsole" checked>
 </html>
