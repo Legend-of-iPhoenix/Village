@@ -241,7 +241,9 @@ function run() {
   var line = 0;
   var commands = text.split('\n');
   var indentLevel = 0;
-  while (line < commands.length) {
+  var infinteLoopProtection = 1000;
+  while (line < commands.length && infinteLoopProtection > 0) {
+    infinteLoopProtection--;
     var command = commands[line];
     var numSpaces = command.match(/^ */)[0].length;
     if (numSpaces && !command.substring(numSpaces).startsWith('-+*'.charAt((numSpaces-1)%3))) {
@@ -357,6 +359,9 @@ function run() {
                     line = line2;
                     didCommand = true;
                   }
+                  if (indentLevel2 < indentLevel) {
+                    line = line2 - 1;
+                  }
                 } else {
                   logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun2 + '" over "' + matches[2] + '".');
                 }
@@ -394,6 +399,9 @@ function run() {
                     if (line2 < commands.length && !threwError) {
                       line = line2;
                       didCommand = true;
+                    }
+                    if (indentLevel2 < indentLevel) {
+                      line = line2 - 1;
                     }
                   } else {
                     logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
@@ -460,5 +468,8 @@ function run() {
       }
     }
     line++;
+  }
+  if (infinteLoopProtection <= 0) {
+    logToConsole("ERROR: Program Crashed, execution took too long.");
   }
 }
