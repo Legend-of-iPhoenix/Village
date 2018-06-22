@@ -272,7 +272,7 @@ function run() {
         }
       } else {
         if (command.startsWith("Tell")) {
-          var matches = command.match(/Tell (\w+) to ([^\.]+)\./);
+          var matches = command.match(/Tell (\w+) to (.+)\./);
           var villagerName = matches[1];
           var action = matches[2];
           var villager = villagers[villagerName];
