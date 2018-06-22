@@ -134,12 +134,13 @@ var generalActions = [
         if (matches[3] == villager.genderPronoun) {
           if ((matches[1] == villager.specialItemType || (matches[1] == villager.specialItemType + 's')) && villager.specialItemType && villager.specialItem) {
             villager.scroll.text += villager.specialItem.quantity + '';
+            logToConsole(villager.name + " successfully wrote the amount of " + matches[1] + " that " + villager.genderPronoun2 + " has on "+ villager.genderPronoun + " scroll.");
             return true;
           } else {
             villager.scroll.text += "0"
+            logToConsole(villager.name + " successfully wrote the amount of " + matches[1] + " that " + villager.genderPronoun2 + " has on "+ villager.genderPronoun + " scroll.");
             return true;
           }
-          logToConsole(villager.name + " successfully wrote the amount of " + matches[1] + " that " + villager.genderPronoun2 + " has on "+ villager.genderPronoun + " scroll.");
         } else {
           logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[3] + '".');
           return false;
@@ -362,9 +363,48 @@ function run() {
               } else {
                 logToConsole("You have not called for that villager yet or that villager is unavailable.");
               }
+            } else {
+              var matches = command.match(/Ask (\w+) if (?:the text on )?(\w+) scroll (starts with|ends with|contains) ['"](.+)['"]\./);
+              if (matches) {
+                var villager = villagers[matches[1]];
+                var pronoun = matches[2];
+                var operator = matches[3];
+                var text = matches[4];
+                if (villager && villager.cooldown === 0) {
+                  if (pronoun == villager.genderPronoun) {
+                    indentLevel++;
+                    var lookingFor = "doesn't";
+                    if (villager.scroll.text !== '' && ((villager.scroll.text.startsWith(text) && operator == 'starts with') || (villager.scroll.text.endsWith(text) && operator == 'ends with') || (villager.scroll.text.indexOf(text) != -1 && operator == 'contains'))) {
+                      lookingFor = "does";
+                    }
+                    lookingFor = "If it " + lookingFor + ":";
+                    var indentLevel2 = indentLevel;
+                    var line2 = line;
+                    var threwError = false;
+                    while (line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+                      line2++;
+                      var numSpaces = commands[line2].match(/^ */)[0].length;
+                      if (numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces-1)%3))) {
+                        logToConsole("Indentation Error on line " + (line+1) + ": Expected '" + '-+*'.charAt((numSpaces-1)%3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+                        threwError = true;
+                        break
+                      }
+                      indentLevel2 = numSpaces;
+                    }
+                    if (line2 < commands.length && !threwError) {
+                      line = line2;
+                      didCommand = true;
+                    }
+                  } else {
+                    logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+                  }
+                } else {
+                  logToConsole("You have not called for that villager yet or that villager is unavailable.");
+                }
+              }
             }
           } else {
-            if (command.startsWith("If")) {
+            if (command.startsWith("If") && indentLevel) {
               var indentLevel2 = indentLevel;
               var line2 = line;
               var threwError = false;
@@ -380,6 +420,17 @@ function run() {
               }
               if (line2 < commands.length && !threwError) {
                 line = line2 - 1;
+              }
+            } else {
+              if (command.startsWith("Skip")) {
+                var matches = command.match(/Skip to (?:step|line) (\d+)\./)
+                if (matches) {
+                  var lineToJump = parseInt(matches[1]); 
+                  if (lineToJump < commands.length && lineToJump > 0) { 
+                    line = lineToJump-2;
+                    didCommand = true;
+                  }
+                }
               }
             }
           }
