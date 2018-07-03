@@ -56,7 +56,7 @@ var occupationActions = {
   "quarryman": "(?:mine|quarry) (\\d+) stone",
   "architect": "(?:create|draft|make) a blueprint for a structure (?:(?:that requires)|(?:requiring)) (\\d+|no) wood and (\\d+|no) stone",
   "builder": "build a structure using (\\w+)'s blueprint, (\\w+)'s wood, and (\\w+)'s stone",
-  "farmer": "[farm|harvest|grow|cultivate] (\\d+) wheat"
+  "farmer": "[cultivate|grow|harvest|farm] (\\d+) wheat"
 }
 
 var generalActions = [
@@ -81,6 +81,23 @@ var generalActions = [
       } else {
         logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
         return false;
+      }
+    }
+  ],
+  ["write (\\w+) occupation on (\\w+) scroll",
+    function (matches, villager, line) {
+      if (matches[1] == villager.genderPronoun && matches[2] == villager.genderPronoun) {
+        villager.scroll.text += villager.occupation;
+        logToConsole("Successfully wrote " + villager.name + "'s occupation on " + villager.genderPronoun + " scroll.");
+        return true;
+      } else {
+        if (matches[1] == villager.genderPronoun) {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+          return false;
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+          return false;
+        }
       }
     }
   ],
@@ -204,7 +221,7 @@ function run() {
   var line = 0;
   var commands = text.split('\n');
   var indentLevel = 0;
-  var infinteLoopProtection = 1000;
+  var infinteLoopProtection = 1000; // TODO: allow changing of this
   while (line < commands.length && infinteLoopProtection > 0) {
     infinteLoopProtection--;
     var command = commands[line];
@@ -384,6 +401,67 @@ function run() {
                   }
                 } else {
                   logToConsole("You have not called for that villager yet or that villager is unavailable.");
+                }
+              } else {
+                var matches = command.match(/Ask (\w+) if (\w+) has (more|less) (\w+) than (\w+)\./)
+                if (matches) {
+                  var villager = villagers[matches[1]]
+                  var pronoun = matches[2]
+                  var comparisonOperator = matches[3]
+                  var itemType = matches[4]
+                  var villager2 = villagers[matches[5]]
+                  if (villager && villager2) {
+                    if (villager.genderPronoun2 == pronoun) {
+                      var lookingFor = "doesn't";
+                      if (comparisonOperator == "more") {
+                        if (villager.specialItemType == itemType && villager2.specialItemType == itemType) {
+                          if (villager.specialItem.quantity > villager2.specialItem.quantity) {
+                            lookingFor = "does";
+                          }
+                        } else {
+                          if (villager.specialItem == itemType) {
+                            lookingFor = "does" // the other villager doesn't have any, by default
+                          }
+                        }
+                      } else {
+                        if (villager.specialItemType == itemType && villager2.specialItemType == itemType) {
+                          if (villager.specialItem.quantity < villager2.specialItem.quantity) {
+                            lookingFor = "does";
+                          }
+                        } else {
+                          if (villager2.specialItem == itemType) {
+                            lookingFor = "does"; // the villager doesn't have any, by default
+                          }
+                        }
+                      }
+                      lookingFor = "If " + villager.genderPronoun2 + ' ' + lookingFor + ":";
+                      indentLevel++;
+                      var indentLevel2 = indentLevel;
+                      var line2 = line;
+                      var threwError = false;
+                      while (line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+                        line2++;
+                        var numSpaces = commands[line2].match(/^ */)[0].length;
+                        if (numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces-1)%3))) {
+                          logToConsole("Indentation Error on line " + (line+1) + ": Expected '" + '-+*'.charAt((numSpaces-1)%3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+                          threwError = true;
+                          break
+                        }
+                        indentLevel2 = numSpaces;
+                      }
+                      if (line2 < commands.length && !threwError) {
+                        line = line2;
+                        didCommand = true;
+                      }
+                      if (indentLevel2 < indentLevel) {
+                        line = line2 - 1;
+                      }
+                    } else {
+                      logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+                    }
+                  } else {
+                    logToConsole("You have not called for that villager yet or that villager is unavailable.");
+                  }
                 }
               }
             }
