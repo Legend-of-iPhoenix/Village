@@ -43,6 +43,11 @@ var occupations = {
   "farmer": "wheat"
 }
 
+var specialOccupations = [ // occupations that can have exactly 0 or exactly 1 of their item.
+  'architect',
+  'builder'
+]
+
 var occupationTasks = {
   "lumberjack": "[harvest|gather|collect] wood",
   "quarryman": "[mine|quarry] stone",
@@ -85,7 +90,7 @@ var generalActions = [
     }
   ],
   ["write (\\w+) occupation on (\\w+) scroll",
-    function (matches, villager, line) {
+    function (matches, villager, line, villagers) {
       if (matches[1] == villager.genderPronoun && matches[2] == villager.genderPronoun) {
         villager.scroll.text += villager.occupation;
         logToConsole("Successfully wrote " + villager.name + "'s occupation on " + villager.genderPronoun + " scroll.");
@@ -102,7 +107,7 @@ var generalActions = [
     }
   ],
   ["post (\\w+) scroll (?:on|to) the [Cc]ommunity [Mm]essage [Bb]oard",
-    function (matches, villager, line) {
+    function (matches, villager, line, villagers) {
       if (matches[1] == villager.genderPronoun) {
         if (villager.scroll.text === '') {
           logToConsole("Error on line " + (line + 1) + ": " + villager.name + "'s scroll does not have any text to post!");
@@ -120,7 +125,7 @@ var generalActions = [
     }
   ],
   ["write the (?:amount|number) of (\\w+) (\\w+) has on (\\w+) scroll",
-    function (matches, villager, line) {
+    function (matches, villager, line, villagers) {
       if (matches[2] == villager.genderPronoun2) {
         if (matches[3] == villager.genderPronoun) {
           if ((matches[1] == villager.specialItemType || (matches[1] == villager.specialItemType + 's')) && villager.specialItemType && villager.specialItem) {
@@ -140,6 +145,67 @@ var generalActions = [
         logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun2 + '" over "' + matches[2] + '".');
         return false;
       }
+    }
+  ],
+  ["(double|triple) (\\w+) (\\w+)",
+    function (matches, villager, line, villagers) {
+      if (matches[2] == villager.genderPronoun) {
+        if (specialOccupations.indexOf(villager.occupation) == -1) {
+          if (villager.cooldown == 0) {
+            if (matches[3].toLowerCase() == villager.specialItemType) {
+              villager.ontaskcompletion = new Item(villager.specialItemType, villager.specialItem.quantity * (matches[1] == 'triple' ? 2 : 1));
+              villager.cooldown = 3;
+              logToConsole("Successfully told " + villager.name + " to " + matches[1] + ' ' + matches[2] + ' ' + matches[3] + ". It will be ready in 3 commands.");
+              return true;
+            }
+          } else {
+            logToConsole("That villager is currently busy!");
+            return false;
+          }
+        }
+      } else {
+        logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun2 + '" over "' + matches[2] + '".');
+        return false;
+      }
+    }
+  ],
+  ["give (\\w+) (half|(?:a|one) third|all) of (\\w+) (\\w+)",
+    function (matches, villager, line, villagers) {
+      if (matches[3] == villager.genderPronoun) {
+        if (villagers[matches[1]] && villagers[matches[1]].cooldown == 0) {
+          if (villager.occupation == villagers[matches[1]].occupation) {
+            if (matches[4].toLowerCase() == villager.specialItemType) {
+              var amount = Math.floor(villager.specialItem.quantity * (matches[2].indexOf('third') == -1 ? (matches[2] == 'all' ? 1 : .5) : 1/3))
+              if (villagers[matches[1]].specialItem === null) {
+                villagers[matches[1]].specialItem = new Item(villager.specialItemType, 0);
+              }
+              villagers[matches[1]].specialItem.quantity += amount
+              villager.specialItem.quantity -= amount
+              logToConsole(villager.name + ' gave ' + matches[1] + ' ' + matches[2] + ' (' + amount + ') of ' + matches[3] + ' ' + matches[4] + '.');
+              return true;
+            }
+          }
+        } else {
+          logToConsole('That villager is currently busy!');
+          return false;
+        }
+      } else {
+        logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[3] + '".');
+        return false;
+      }
+    }
+  ],
+  ['(?:dispose of|empty|clear) (\\w+) inventory',
+    function (matches, villager, line, villagers) {
+      if (matches[1] == villager.genderPronoun) {
+        villager.specialItem = null;
+        logToConsole('Cleared ' + villager.name + "'s inventory.");
+        return true;
+      } else {
+        logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+        return false;
+      }
+      return false;
     }
   ]
 ];
@@ -301,7 +367,7 @@ function run() {
                       logToConsole("Successfully told " + villager.name + " to build a structure. It will be complete in 5 commands.");
                       didCommand = true;
                     } else {
-                      logToConsole("Error on line " + line + ": Insufficient building materials!")
+                      logToConsole("Error on line " + (line + 1) + ": Insufficient building materials!")
                     }
                   }
                 }
@@ -312,7 +378,7 @@ function run() {
                 var successCallback = data[1];
                 match = action.match(new RegExp(actionRegEx));
                 if (match) {
-                  if (successCallback(match, villager, line)) {
+                  if (successCallback(match, villager, line, villagers)) {
                     didCommand = true;
                   }
                 }
