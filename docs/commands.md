@@ -1,7 +1,7 @@
 ## Tell
 These commands perform an action. Tell commands can be "general" (able to be executed by any villager), or "occupation-specific" (only able to be executed by a villager with a specific occupation)
 
-General:
+### General
 ```
 Tell <villager> to write the text "<text>" on {his|her} scroll.
 Tell <villager> to write {his|her} occupation on {his|her} scroll.
@@ -14,10 +14,20 @@ Tell <villager> to erase the {first|last} character on {his|her} scroll.
 Tell <villager> to clear {his|her} scroll.
 Tell <villager> to trade scrolls with <other villager>.
 ```
-Occupation-specific:
+**WARNING**:  
+Do not compare the inventories of architects, builders, or janitors.
+### Occupation-specific
+(format: `<occupation name>: <command>`)
 ```
-WIP
+lumberjack: Tell <villager> to harvest <number> wood.
+quarryman:  Tell <villager> to mine <number> stone.
+architect:  Tell <villager> to draft a blueprint for a structure requiring {<number>|no} wood and {<number>|no} stone.
+builder:    Tell <villager> to build a structure using <architect>'s blueprint, <lumberjack>'s wood, and <quarryman>'s stone.
+janitor:    Tell <villager> to remove {<number>|all} {scroll|scrolls} from the Community Message Board.
+farmer:     Tell <villager> to grow {<number>} wheat.
 ```
+Note:
+When the janitor's occupation-specific command is executed, the janitor will throw out his/her current scroll and replace it with the last scroll that they removed. <sup><sub>This allows the Community Message Board to function as a stack. </sup></sub>
 ## Skip
 ```
 Skip to {line|step} <line>.
