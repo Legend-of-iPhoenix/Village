@@ -96,7 +96,7 @@ var specialOccupations = { // occupations that can have exactly 0 or exactly 1 o
         lastScroll = messageBoard.pop()
       }
       villager.scroll = lastScroll;
-      document.getElementById("messageBoard").value = messageBoard.map(scroll => scroll.text).join('\n');
+      document.getElementById("messageBoard").value = messageBoard.map(scroll => scroll.text).join('\n') + '\n';
       logToConsole("Successfully told " + villager.name + " to clean " + number + " scroll" + (number != 1 ? 's' : '') + " off of the message board. " + villager.name + " replaced " + villager.genderPronoun + " scroll with the last one " + villager.genderPronoun2 + " removed.")
       return true
     } else {
@@ -123,6 +123,203 @@ var occupationActions = {
   "janitor": "clea(?:n|r) (\\d+|all) messages? off of the [Cc]ommunity [Mm]essage [Bb]oard|remove (\\d+|all) scrolls? from the [Cc]ommunity [Mm]essage [Bb]oard",
   "farmer": "[cultivate|grow|harvest|farm] (\\d+) wheat"
 }
+
+var askCommands = [
+  [/Ask (\w+) if (\w+) has (any|\d+) (\w+)s?\./,
+    function(matches, line, indentLevel, commands, villagers) {
+      var didCommand = false;
+      var villager = villagers[matches[1]];
+      var pronoun = matches[2];
+      var amount = matches[3] == "any" ? 1 : parseInt(matches[3]);
+      var material = matches[4];
+      if(villager && villager.cooldown === 0) {
+        if(pronoun == villager.genderPronoun2) {
+          indentLevel++;
+          var lookingFor = "doesn't";
+          if(villager.specialItemType == material && villager.specialItem && villager.specialItem.quantity >= amount) {
+            lookingFor = "does";
+          }
+          lookingFor = "If " + villager.genderPronoun2 + " " + lookingFor + ":";
+          var indentLevel2 = indentLevel;
+          var line2 = line;
+          var threwError = false;
+          while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+            line2++;
+            var numSpaces = commands[line2].match(/^ */)[0].length;
+            if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
+              logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+              threwError = true;
+              break
+            }
+            indentLevel2 = numSpaces;
+          }
+          if(line2 < commands.length && !threwError) {
+            line = line2;
+            didCommand = true;
+          }
+          if(indentLevel2 < indentLevel) {
+            line = line2 - 1;
+          }
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun2 + '" over "' + matches[2] + '".');
+        }
+      } else {
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
+      }
+      return [line, indentLevel, didCommand]
+    }
+  ],
+  [/Ask (\w+) if (?:the text on )?(\w+) scroll (starts with|ends with|contains) ['"](.+)['"]\./,
+    function(matches, line, indentLevel, commands, villagers) {
+      var didCommand = false;
+      var villager = villagers[matches[1]];
+      var pronoun = matches[2];
+      var operator = matches[3];
+      var text = matches[4];
+      if(villager && villager.cooldown === 0) {
+        if(pronoun == villager.genderPronoun) {
+          indentLevel++;
+          var lookingFor = "doesn't";
+          if(villager.scroll.text !== '' && ((villager.scroll.text.startsWith(text) && operator == 'starts with') || (villager.scroll.text.endsWith(text) && operator == 'ends with') || (villager.scroll.text.indexOf(text) != -1 && operator == 'contains'))) {
+            lookingFor = "does";
+          }
+          lookingFor = "If it " + lookingFor + ":";
+          var indentLevel2 = indentLevel;
+          var line2 = line;
+          var threwError = false;
+          while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+            line2++;
+            var numSpaces = commands[line2].match(/^ */)[0].length;
+            if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
+              logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+              threwError = true;
+              break
+            }
+            indentLevel2 = numSpaces;
+          }
+          if(line2 < commands.length && !threwError) {
+            line = line2;
+            didCommand = true;
+          }
+          if(indentLevel2 < indentLevel) {
+            line = line2 - 1;
+          }
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+        }
+      } else {
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
+      }
+      return [line, indentLevel, didCommand]
+    }
+  ],
+  [/Ask (\w+) if (\w+) has (more|less) (\w+) than (\w+)\./,
+    function(matches, line, indentLevel, commands, villagers) {
+      var didCommand = false;
+      var villager = villagers[matches[1]]
+      var pronoun = matches[2]
+      var comparisonOperator = matches[3]
+      var itemType = matches[4]
+      var villager2 = villagers[matches[5]]
+      if(villager && villager2 && villager.cooldown === 0 && villager2.cooldown === 0) {
+        if(villager.genderPronoun2 == pronoun) {
+          var lookingFor = "doesn't";
+          if(comparisonOperator == "more") {
+            if(villager.specialItemType == itemType && villager2.specialItemType == itemType) {
+              if(villager.specialItem.quantity > villager2.specialItem.quantity) {
+                lookingFor = "does";
+              }
+            } else {
+              if(villager.specialItem == itemType) {
+                lookingFor = "does" // the other villager doesn't have any, by default
+              }
+            }
+          } else {
+            if(villager.specialItemType == itemType && villager2.specialItemType == itemType) {
+              if(villager.specialItem.quantity < villager2.specialItem.quantity) {
+                lookingFor = "does";
+              }
+            } else {
+              if(villager2.specialItem == itemType) {
+                lookingFor = "does"; // the villager doesn't have any, by default
+              }
+            }
+          }
+          lookingFor = "If " + villager.genderPronoun2 + ' ' + lookingFor + ":";
+          indentLevel++;
+          var indentLevel2 = indentLevel;
+          var line2 = line;
+          var threwError = false;
+          while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+            line2++;
+            var numSpaces = commands[line2].match(/^ */)[0].length;
+            if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
+              logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+              threwError = true;
+              break
+            }
+            indentLevel2 = numSpaces;
+          }
+          if(line2 < commands.length && !threwError) {
+            line = line2;
+            didCommand = true;
+          }
+          if(indentLevel2 < indentLevel) {
+            line = line2 - 1;
+          }
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+        }
+      } else {
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
+      }
+      return [line, indentLevel, didCommand]
+    }
+  ],
+  [/Ask (\w+) if (\w+) is an? (\w+)\./, 
+    function(matches, line, indentLevel, commands, villagers) {
+      var didCommand = false;
+      var villager = villagers[matches[1]]
+      var pronoun = matches[2]
+      var occupation = matches[3]
+      if (villager && villager.cooldown === 0) {
+        if (villager.genderPronoun2 == pronoun) {
+          var lookingFor = "isn't"
+          if (occupation.toLowerCase() == villager.occupation) {
+            lookingFor = "is"
+          }
+          lookingFor = "If " + villager.genderPronoun2 + ' ' + lookingFor + ":";
+          indentLevel++;
+          var indentLevel2 = indentLevel;
+          var line2 = line;
+          var threwError = false;
+          while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
+            line2++;
+            var numSpaces = commands[line2].match(/^ */)[0].length;
+            if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
+              logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
+              threwError = true;
+              break
+            }
+            indentLevel2 = numSpaces;
+          }
+          if(line2 < commands.length && !threwError) {
+            line = line2;
+            didCommand = true;
+          }
+          if(indentLevel2 < indentLevel) {
+            line = line2 - 1;
+          }
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
+        }
+      } else {
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
+      }
+      return [line, indentLevel, didCommand]
+    }
+  ]
+]
 
 var generalActions = [
   ['write the text "([^"]+)" on (\\w+) scroll',
@@ -257,44 +454,72 @@ var generalActions = [
   ],
   ['(?:dispose of|empty|clear) (\\w+) inventory',
     function(matches, villager, line, villagers) {
-      if(matches[1] == villager.genderPronoun) {
-        villager.specialItem = null;
-        logToConsole('Cleared ' + villager.name + "'s inventory.");
-        return true;
+      if (villager.cooldown === 0) {
+        if(matches[1] == villager.genderPronoun) {
+          villager.specialItem = null;
+          logToConsole('Cleared ' + villager.name + "'s inventory.");
+          return true;
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+          return false;
+        }
       } else {
-        logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+        logToConsole("That villager is currently busy!");
         return false;
       }
-      return false;
     }
   ],
   ['(?:erase|delete|remove) the (last|first) character on (\\w+) scroll',
     function(matches, villager, line, villagers) {
-      if(matches[2] == villager.genderPronoun) {
-        if(matches[1] == "last") {
-          villager.scroll.text = villager.scroll.text.slice(0, -1);
-          logToConsole("Successfully removed the last character on " + villager.name + "'s scroll.")
+      if (villager.cooldown === 0) {
+        if(matches[2] == villager.genderPronoun) {
+          if(matches[1] == "last") {
+            villager.scroll.text = villager.scroll.text.slice(0, -1);
+            logToConsole("Successfully removed the last character on " + villager.name + "'s scroll.")
+            return true;
+          } else {
+            villager.scroll.text = villager.scroll.text.substring(1);
+            logToConsole("Successfully removed the first character on " + villager.name + "'s scroll.")
+            return true;
+          }
         } else {
-          villager.scroll.text = villager.scroll.text.substring(1);
-          logToConsole("Successfully removed the first character on " + villager.name + "'s scroll.")
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+          return false;
         }
       } else {
-        logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+        logToConsole("That villager is currently busy!");
+        return false;
+      }
+    }
+  ],
+  ['clear (\\w+) scroll',
+    function(matches, villager, line, villagers) {
+      if (villager.cooldown === 0) {
+        if (matches[1] === villager.genderPronoun) {
+          villager.scroll.text = '';
+          logToConsole("Successfully cleared " + villager.name + "'s scroll.");
+          return true;
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+          return false;
+        }
+      } else {
+        logToConsole("That villager is currently busy!");
         return false;
       }
     }
   ],
   ['(?:trade|swap) scrolls with (\\w+)',
     function(matches, villager, line, villagers) {
-      var secondVillager = villagers[matches[1]]
-      if(secondVillager) {
+      var villager2 = villagers[matches[1]]
+      if(villager2 && villager.cooldown === 0 && villager2.cooldown === 0) {
         var temp = villager.scroll.text;
-        villager.scroll.text = secondVillager.scroll.text;
-        secondVillager.scroll = new Scroll(temp);
-        logToConsole("Successfully swapped the scrolls of " + secondVillager.name + " and " + villager.name + ".");
+        villager.scroll.text = villager2.scroll.text;
+        villager2.scroll = new Scroll(temp);
+        logToConsole("Successfully swapped the scrolls of " + villager2.name + " and " + villager.name + ".");
         return true;
       } else {
-        logToConsole("Error on line " + (line + 1) + ": " + matches[1] + " is not a valid villager name.");
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
         return false;
       }
     }
@@ -449,150 +674,12 @@ function run() {
           }
         } else {
           if(command.startsWith("Ask")) {
-            var matches = command.match(/Ask (\w+) if (\w+) has (any|\d+) (\w+)s?\./);
-            if(matches) {
-              var villager = villagers[matches[1]];
-              var pronoun = matches[2];
-              var amount = matches[3] == "any" ? 1 : parseInt(matches[3]);
-              var material = matches[4];
-              if(villager && villager.cooldown === 0) {
-                if(pronoun == villager.genderPronoun2) {
-                  indentLevel++;
-                  var lookingFor = "doesn't";
-                  if(villager.specialItemType == material && villager.specialItem && villager.specialItem.quantity >= amount) {
-                    lookingFor = "does";
-                  }
-                  lookingFor = "If " + villager.genderPronoun2 + " " + lookingFor + ":";
-                  var indentLevel2 = indentLevel;
-                  var line2 = line;
-                  var threwError = false;
-                  while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
-                    line2++;
-                    var numSpaces = commands[line2].match(/^ */)[0].length;
-                    if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
-                      logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
-                      threwError = true;
-                      break
-                    }
-                    indentLevel2 = numSpaces;
-                  }
-                  if(line2 < commands.length && !threwError) {
-                    line = line2;
-                    didCommand = true;
-                  }
-                  if(indentLevel2 < indentLevel) {
-                    line = line2 - 1;
-                  }
-                } else {
-                  logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun2 + '" over "' + matches[2] + '".');
-                }
-              } else {
-                logToConsole("You have not called for that villager yet or that villager is unavailable.");
-              }
-            } else {
-              var matches = command.match(/Ask (\w+) if (?:the text on )?(\w+) scroll (starts with|ends with|contains) ['"](.+)['"]\./);
-              if(matches) {
-                var villager = villagers[matches[1]];
-                var pronoun = matches[2];
-                var operator = matches[3];
-                var text = matches[4];
-                if(villager && villager.cooldown === 0) {
-                  if(pronoun == villager.genderPronoun) {
-                    indentLevel++;
-                    var lookingFor = "doesn't";
-                    if(villager.scroll.text !== '' && ((villager.scroll.text.startsWith(text) && operator == 'starts with') || (villager.scroll.text.endsWith(text) && operator == 'ends with') || (villager.scroll.text.indexOf(text) != -1 && operator == 'contains'))) {
-                      lookingFor = "does";
-                    }
-                    lookingFor = "If it " + lookingFor + ":";
-                    var indentLevel2 = indentLevel;
-                    var line2 = line;
-                    var threwError = false;
-                    while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
-                      line2++;
-                      var numSpaces = commands[line2].match(/^ */)[0].length;
-                      if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
-                        logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
-                        threwError = true;
-                        break
-                      }
-                      indentLevel2 = numSpaces;
-                    }
-                    if(line2 < commands.length && !threwError) {
-                      line = line2;
-                      didCommand = true;
-                    }
-                    if(indentLevel2 < indentLevel) {
-                      line = line2 - 1;
-                    }
-                  } else {
-                    logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
-                  }
-                } else {
-                  logToConsole("You have not called for that villager yet or that villager is unavailable.");
-                }
-              } else {
-                var matches = command.match(/Ask (\w+) if (\w+) has (more|less) (\w+) than (\w+)\./)
-                if(matches) {
-                  var villager = villagers[matches[1]]
-                  var pronoun = matches[2]
-                  var comparisonOperator = matches[3]
-                  var itemType = matches[4]
-                  var villager2 = villagers[matches[5]]
-                  if(villager && villager2) {
-                    if(villager.genderPronoun2 == pronoun) {
-                      var lookingFor = "doesn't";
-                      if(comparisonOperator == "more") {
-                        if(villager.specialItemType == itemType && villager2.specialItemType == itemType) {
-                          if(villager.specialItem.quantity > villager2.specialItem.quantity) {
-                            lookingFor = "does";
-                          }
-                        } else {
-                          if(villager.specialItem == itemType) {
-                            lookingFor = "does" // the other villager doesn't have any, by default
-                          }
-                        }
-                      } else {
-                        if(villager.specialItemType == itemType && villager2.specialItemType == itemType) {
-                          if(villager.specialItem.quantity < villager2.specialItem.quantity) {
-                            lookingFor = "does";
-                          }
-                        } else {
-                          if(villager2.specialItem == itemType) {
-                            lookingFor = "does"; // the villager doesn't have any, by default
-                          }
-                        }
-                      }
-                      lookingFor = "If " + villager.genderPronoun2 + ' ' + lookingFor + ":";
-                      indentLevel++;
-                      var indentLevel2 = indentLevel;
-                      var line2 = line;
-                      var threwError = false;
-                      while(line2 < commands.length && !(commands[line2].substring(indentLevel2 + (!!indentLevel2)).trim().startsWith(lookingFor) && indentLevel2 == indentLevel) && indentLevel2 >= indentLevel) {
-                        line2++;
-                        var numSpaces = commands[line2].match(/^ */)[0].length;
-                        if(numSpaces && !commands[line2].substring(numSpaces).startsWith('-+*'.charAt((numSpaces - 1) % 3))) {
-                          logToConsole("Indentation Error on line " + (line + 1) + ": Expected '" + '-+*'.charAt((numSpaces - 1) % 3) + "', recieved '" + commands[line2].charAt(numSpaces + 1));
-                          threwError = true;
-                          break
-                        }
-                        indentLevel2 = numSpaces;
-                      }
-                      if(line2 < commands.length && !threwError) {
-                        line = line2;
-                        didCommand = true;
-                      }
-                      if(indentLevel2 < indentLevel) {
-                        line = line2 - 1;
-                      }
-                    } else {
-                      logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[2] + '".');
-                    }
-                  } else {
-                    logToConsole("You have not called for that villager yet or that villager is unavailable.");
-                  }
-                }
-              }
-            }
+            var option = askCommands.find(option=>command.match(option[0]));
+            var matches = command.match(option[0]);
+            var result = option[1](matches, line, indentLevel, commands, villagers);
+            line = result[0]
+            indentLevel = result[1]
+            didCommand = result[2]
           } else {
             if(command.startsWith("If") && indentLevel) {
               var indentLevel2 = indentLevel;
