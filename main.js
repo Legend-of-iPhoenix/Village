@@ -107,12 +107,12 @@ var specialOccupations = { // occupations that can have exactly 0 or exactly 1 o
 }
 
 var occupationTasks = {
-  "lumberjack": "[harvest|gather|collect] wood",
-  "quarryman": "[mine|quarry] stone",
+  "lumberjack": "(?:harvest|gather|collect) wood",
+  "quarryman": "(?:mine|quarry) stone",
   "architect": "draft blueprints",
   "builder": "build structures",
   "janitor": "clean the [Cc]ommunity [Mm]essage [Bb]oard",
-  "farmer": "[cultivate|grow|harvest|farm] wheat"
+  "farmer": "(?:cultivate|grow|harvest|farm) wheat"
 }
 
 var occupationActions = {
