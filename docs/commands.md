@@ -17,12 +17,14 @@ Tell <villager> to trade scrolls with <other villager>.
 **WARNING**:  
 Do not compare the inventories of architects, builders, or janitors.
 ### Occupation-specific
-(format: `<occupation name>: <command>`)
+(format: `<occupation name>: <command>`, some occupations may have two or more occupation-specific commands)
 ```
 lumberjack: Tell <villager> to harvest <number> wood.
 quarryman:  Tell <villager> to mine <number> stone.
 architect:  Tell <villager> to draft a blueprint for a structure requiring {<number>|no} wood and {<number>|no} stone.
+architect:  Tell <villager> to draft a blueprint for a railroad to the {north|south|east|west} village.
 builder:    Tell <villager> to build a structure using <architect>'s blueprint, <lumberjack>'s wood, and <quarryman>'s stone.
+builder:    Tell <villager> to build a railroad using <architect>'s blueprint and <lumberjack>'s wood.
 janitor:    Tell <villager> to remove {<number>|all} {scroll|scrolls} from the Community Message Board.
 farmer:     Tell <villager> to grow {<number>} wheat.
 ```
