@@ -1,5 +1,6 @@
 var DEBUG = true,
   logToConsole;
+
 var trains = {
   north: false,
   south: false,
@@ -48,25 +49,40 @@ var occupations = {
   "architect": "blueprint",
   "builder": false, // the builder builds buildings, but doesn't have its own item. I chose false as a placeholder because it is easy to check for.
   "farmer": "wheat",
-  "janitor": false
+  "janitor": false,
+  "messenger": false
 }
 
-var specialOccupations = { // occupations that can have exactly 0 or exactly 1 of their item.
+var specialOccupations = {
   'architect': function (command, matches, villager, line, villagers) {
     if (villager.specialItem == null) {
       if (matches[1] == "structure" || matches[1] == "house") {
-        villager.ontaskcompletion = new Item("blueprint", 1, {
-          type: "house",
-          wood: isNaN(parseInt(matches[2])) ? 0 : parseInt(matches[2]),
-          stone: isNaN(parseInt(matches[3])) ? 0 : parseInt(matches[3])
-        });
+        villager.ontaskcompletion = {
+          data: [parseInt(matches[2]), parseInt(matches[3])],
+          callback: function (data, villager) {
+            villager.specialItem = new Item("blueprint", 1, {
+              type: "house",
+              wood: isNaN(data[0]) ? 0 : data[0],
+              stone: isNaN(data[1]) ? 0 : data[1]
+            });
+            logToConsole(villager.name + " has completed " + villager.genderPronoun + " blueprint for the house.");
+          }
+        }
         logToConsole("Successfully told " + villager.name + " to create a blueprint for a house. It will be ready in 3 commands.");
         return true;
       } else {
-        villager.ontaskcompletion = new Item("blueprint", 1, {
-          type: "railroad",
-          direction: matches[2]
-        });
+        villager.ontaskcompletion = {
+          data: [matches[2]],
+          callback: function (data, villager) {
+            villager.specialItem = new Item("blueprint", 1, {
+              type: "railroad",
+              direction: data[0]
+            });
+            logToConsole(villager.name + " has completed " + villager.genderPronoun + " blueprint for the railroad to the " + data[0] + " village.");
+          }
+        }
+        logToConsole("Successfully told " + villager.name + " to create a blueprint for a railroad. It will be ready in 3 commands.");
+        return true
       }
     } else {
       logToConsole(villager.name + " already has a blueprint, which needs to be used before another can be created.");
@@ -77,24 +93,33 @@ var specialOccupations = { // occupations that can have exactly 0 or exactly 1 o
     villager.cooldown = 5;
     var architect = villagers[matches[2]];
     var lumberjack = villagers[matches[3]];
-    if (architect.specialItem) {
-      if (architect.specialItem.value.type == "house") {
+    var blueprint = architect.specialItem;
+    var wood = lumberjack.specialItem.quantity;
+    if (blueprint) {
+      blueprint = blueprint.value;
+      if (blueprint.type == "house") {
         var quarryman = villagers[matches[4]];
-        if (quarryman.specialItem.quantity >= architect.specialItem.value.stone && lumberjack.specialItem.quantity >= architect.specialItem.value.wood) {
-          quarryman.specialItem.quantity -= architect.specialItem.value.stone;
-          lumberjack.specialItem.quantity -= architect.specialItem.value.wood;
-          villager.ontaskcompletion = {
-            type: "house",
-            capacity: 0
-          };
-          if (architect.specialItem.value.stone >= 5 && architect.specialItem.value.wood >= 10) {
+        var stone = quarryman.specialItem.quantity
+        if (stone >= blueprint.stone && wood >= blueprint.wood) {
+          quarryman.specialItem.quantity -= blueprint.stone;
+          lumberjack.specialItem.quantity -= blueprint.wood;
+          var capacity = 0;
+          if (blueprint.stone >= 5 && blueprint.wood >= 10) {
             // this is just a fast calculation of how many more villagers we should add
             // village capacity increase = the maximum amount of houses we can build
-            villager.ontaskcompletion.capacity = ((r, e) => {
+            capacity = ((r, e) => {
               for (c = 0; r > 0 && e > 0;) r -= 5, e -= 10, c++;
               return c
-            })(architect.specialItem.value.stone, architect.specialItem.value.wood)
+            })(blueprint.stone, blueprint.wood)
           }
+          villager.ontaskcompletion = {
+            data: [capacity],
+            callback: function (data, villager) {
+              villagerLimit += data[0];
+              logToConsole("The villager limit increased by " + data[0]);
+            }
+          }
+
           logToConsole("Successfully told " + villager.name + " to build a structure. It will be complete in 5 commands.");
           return true
         } else {
@@ -102,13 +127,17 @@ var specialOccupations = { // occupations that can have exactly 0 or exactly 1 o
           return false
         }
       } else {
-        if (architect.specialItem.value.type == "railroad") {
-          if (lumberjack.specialItem.quantity >= 20) {
+        if (blueprint.type == "railroad") {
+          if (wood >= 20) {
             lumberjack.specialItem.quantity -= 20;
+
             villager.ontaskcompletion = {
-              type: "railroad",
-              direction: architect.specialItem.value.direction
-            };
+              data: [blueprint.direction],
+              callback: function (data, villager) {
+                trains[data[0]] = true;
+                logToConsole("The train line to the " + data[0] + " village is complete");
+              }
+            }
             villager.cooldown = 5;
             logToConsole("Successfully told " + villager.name + " to build a railroad. It will be complete in 5 commands.")
             return true
@@ -140,6 +169,10 @@ var specialOccupations = { // occupations that can have exactly 0 or exactly 1 o
       logToConsole("Error on line " + (line + 1) + ": There are less than " + number + " scrolls on the message board.")
       return false
     }
+  },
+  'messenger': function (command, matches, villager, line, villagers) {
+    logToConsole("ERROR: Messengers are a work in progress and will come in a future update.");
+    return false
   }
 }
 
@@ -149,16 +182,18 @@ var occupationTasks = {
   "architect": "draft blueprints",
   "builder": "build structures",
   "janitor": "clean the [Cc]ommunity [Mm]essage [Bb]oard",
-  "farmer": "(?:cultivate|grow|harvest|farm) wheat"
+  "farmer": "(?:cultivate|grow|harvest|farm) wheat",
+  "messenger": "carry messenges"
 }
 
 var occupationActions = {
-  "lumberjack": ["(?:gather|collect|harvest) (\\d+) wood"],
+  "lumberjack": ["(?:gather|collect|harvest|chop) (\\d+) wood"],
   "quarryman": ["(?:mine|quarry) (\\d+) stone"],
-  "architect": ["(?:create|draft|make) a blueprint for a (structure|house) (?:that requires|requiring) (\\d+|no) wood and (\\d+|no) stone", "(?:create|draft|make) a blueprint for a (railroad|train line) to the (north|south|east|west) village"],
+  "architect": ["(?:create|draft|make) a blueprint for a (structure|house) (?:that requires|requiring) (\\d+|no) wood and (\\d+|no) stone", "(?:create|draft|make) a blueprint for a (railroad|train line) to the ([Nn]orth|[Ss]outh|[Ee]ast|[Ww]est) village"],
   "builder": ["build a (structure|house) using (\\w+)'s blueprint, (\\w+)'s wood, and (\\w+)'s stone", "build a (railroad|train line) using (\\w+)'s blueprint and (\\w+)'s wood"],
   "janitor": ["clea(?:n|r) (\\d+|all) messages? off of the [Cc]ommunity [Mm]essage [Bb]oard|remove (\\d+|all) scrolls? from the [Cc]ommunity [Mm]essage [Bb]oard"],
-  "farmer": ["[cultivate|grow|harvest|farm] (\\d+) wheat"]
+  "farmer": ["[cultivate|grow|harvest|farm] (\\d+) wheat"],
+  "messenger": ["go to the ([Nn]orth|[Ss]outh|[Ee]ast|[Ww]est) village with (\\w+)'s scroll"]
 }
 
 var askCommands = [
@@ -206,7 +241,7 @@ var askCommands = [
       return [line, indentLevel, didCommand]
     }
   ],
-  [/Ask (\w+) if (?:the text on )?(\w+) scroll (starts with|ends with|contains) ['"](.+)['"]\./,
+  [/Ask (\w+) if (?:the text on )?(\w+) scroll (starts with|ends with|contains) (?:the text )?['"](.+)['"]\./,
     function (matches, line, indentLevel, commands, villagers) {
       var didCommand = false;
       var villager = villagers[matches[1]];
@@ -407,7 +442,8 @@ var generalActions = [
           logToConsole("Error on line " + (line + 1) + ": " + villager.name + "'s scroll does not have any text to post!");
           return false;
         } else {
-          postToMessageBoard(villager.scroll);
+          messageBoard.push(new Scroll(villager.scroll.text)); // shallow copy
+          document.getElementById("messageBoard").value += villager.scroll.text + '\n';
           logToConsole(villager.name + " successfully posted " + villager.genderPronoun + " scroll to the message board and returned with a clean one.");
           villager.scroll.text = "";
           return true;
@@ -447,7 +483,20 @@ var generalActions = [
         if (Object.keys(specialOccupations).indexOf(villager.occupation) == -1) {
           if (villager.cooldown == 0) {
             if (matches[3].toLowerCase() == villager.specialItemType) {
-              villager.ontaskcompletion = new Item(villager.specialItemType, villager.specialItem.quantity * (matches[1] == 'triple' ? 2 : 1));
+              var amount = this.specialItem.quantity * (matches[1] == 'triple' ? 2 : 1);
+              villager.ontaskcompletion = {
+                data: [amount],
+                callback: function (data, villager) {
+                  amount = data[0];
+                  if (villager.specialItem == null) {
+                    villager.specialItem = new Item(villager.specialItemType, amount);
+                    logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". villager is all of the " + villager.specialItemType + " " + villager.genderPronoun2 + " has.");
+                  } else {
+                    villager.specialItem.quantity += amount;
+                    logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". They now have " + villager.specialItem.quantity + ' ' + villager.specialItemType + ".");
+                  }
+                }
+              }
               villager.cooldown = 3;
               logToConsole("Successfully told " + villager.name + " to " + matches[1] + ' ' + matches[2] + ' ' + matches[3] + ". It will be ready in 3 commands.");
               return true;
@@ -560,6 +609,24 @@ var generalActions = [
         return false;
       }
     }
+  ],
+  ['write the (2?1st|2?2nd|2?3rd|[4-9]th|1[0-9]th|2[0456]th) letter (?:of the alphebet )?on (\\w+) scroll',
+    function (matches, villager, line, villagers) {
+      if (villager.cooldown === 0) {
+        if (villager.genderPronoun == matches[2]) {
+          var num = parseInt(matches[1].match(/\d+/g)[0]) - 1;
+          villager.scroll.text += String.fromCharCode('a'.charCodeAt(0) + num)
+          logToConsole(villager.name + ' successfully wrote the letter "' + String.fromCharCode('a'.charCodeAt(0) + num) + '" on her scroll.')
+          return true
+        } else {
+          logToConsole("Error on line " + (line + 1) + ": " + villager.name + " is " + villager.gender + ' and prefers that you use "' + villager.genderPronoun + '" over "' + matches[1] + '".');
+          return false;
+        }
+      } else {
+        logToConsole("You have not called for that villager yet or that villager is unavailable.");
+        return false;
+      }
+    }
   ]
 ];
 
@@ -575,7 +642,10 @@ function Villager(name, gender, occupation) {
   this.occupation = occupation;
   this.scroll = new Scroll('');
   this.cooldown = 0;
-  this.ontaskcompletion = new Item();
+  this.ontaskcompletion = {
+    data: [],
+    callback: function (data, villager) {}
+  };
   this.specialItem = null;
   this.specialItemType = undefined;
 }
@@ -588,17 +658,6 @@ function Item(type, quantity, value) {
 
 function Scroll(text) {
   this.text = text;
-}
-
-function postToMessageBoard(scroll) {
-  messageBoard.push(new Scroll(scroll.text)); // shallow copy
-  document.getElementById("messageBoard").value += scroll.text + '\n';
-}
-
-function Routine(name, start, end) {
-  this.name = name;
-  this.start = start;
-  this.end = end;
 }
 
 // I'm choosing names of people who had an impact on computer science, programming, or mathematics. Generally, I'm using names that sound relatively English. Sorry Ramanujan.
@@ -687,12 +746,23 @@ function run() {
           var villager = villagers[villagerName];
           if (villager && villager.cooldown === 0) {
             var regex = occupationActions[villager.occupation].find(r => action.match(new RegExp(r)));
-
             if (regex) {
               var matches = action.match(regex);
               villager.cooldown = 3;
               if (!specialOccupations[villager.occupation]) { // if we don't have a special handler registered
-                villager.ontaskcompletion = new Item(villager.specialItemType, parseInt(matches[1]));
+                villager.ontaskcompletion = {
+                  data: [parseInt(matches[1])],
+                  callback: function (data, villager) {
+                    var amount = data[0];
+                    if (villager.specialItem == null) {
+                      villager.specialItem = new Item(villager.specialItemType, amount);
+                      logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". villager is all of the " + villager.specialItemType + " " + villager.genderPronoun2 + " has.");
+                    } else {
+                      villager.specialItem.quantity += amount;
+                      logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". They now have " + villager.specialItem.quantity + ' ' + villager.specialItemType + ".");
+                    }
+                  }
+                }
                 logToConsole("Successfully told " + villager.name + " to " + action + ". It will be ready in 3 commands.");
                 didCommand = true;
               } else {
@@ -752,12 +822,13 @@ function run() {
                   var matches = command.match(/Teach (\w+) how to ([a-zA-Z ]+)\./)
                   if (matches) {
                     var villagerName = matches[1];
-                    if (villagers[villagerName] && villagers[villagerName].cooldown == 0) {
-                      if (villagers[villagerName].occupation === undefined) {
+                    var villager = villagers[villagerName]
+                    if (villager && villager.cooldown == 0) {
+                      if (villager.occupation === undefined) {
                         var occupation = Object.keys(occupationTasks).find(x => matches[2].match(occupationTasks[x]))
                         if (occupation) {
-                          villagers[villagerName].occupation = occupation;
-                          villagers[villagerName].specialItemType = occupations[occupation];
+                          villager.occupation = occupation;
+                          villager.specialItemType = occupations[occupation];
                           logToConsole("Taught " + villagerName + " how to " + matches[2] + ". ")
                         } else {
                           logToConsole("That is not a valid skill! A list of valid skills can be found in the documentation.");
@@ -781,29 +852,7 @@ function run() {
           if (villager.cooldown > 0) {
             villager.cooldown -= 1;
             if (villager.cooldown == 0) {
-              if (!specialOccupations[villager.occupation]) {
-                if (villager.specialItem === null) {
-                  villager.specialItem = villager.ontaskcompletion;
-                  logToConsole(name + " has finished collecting " + villager.ontaskcompletion.quantity + " " + villager.specialItemType + ". This is all of the " + villager.specialItemType + " " + villager.genderPronoun2 + " has.");
-                } else {
-                  villager.specialItem.quantity += villager.ontaskcompletion.quantity;
-                  logToConsole(name + " has finished collecting " + villager.ontaskcompletion.quantity + " " + villager.specialItemType + ". They now have " + villager.specialItem.quantity + ' ' + villager.specialItemType + ".");
-                }
-              } else {
-                villager.specialItem = villager.ontaskcompletion;
-                logToConsole(name + " has finished " + villager.genderPronoun + " task.")
-                if (villager.occupation === "builder") {
-                  villager.specialItem = null;
-                  if (villager.ontaskcompletion.type == "house") {
-                    if (villager.ontaskcompletion.quantity) {
-                      villagerLimit += villager.ontaskcompletion.quantity;
-                      logToConsole("The villager limit increased by " + villager.ontaskcompletion.quantity);
-                    }
-                  } else {
-                    trains[villager.ontaskcompletion.direction] = true;
-                  }
-                }
-              }
+              villager.ontaskcompletion.callback(villager.ontaskcompletion.data, villager)
               villager.ontaskcompletion = null;
             }
           }

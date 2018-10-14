@@ -13,6 +13,7 @@ Tell <villager> to clear {his|her} inventory.
 Tell <villager> to erase the {first|last} character on {his|her} scroll.
 Tell <villager> to clear {his|her} scroll.
 Tell <villager> to trade scrolls with <other villager>.
+Tell <villager> to write the <nth> letter on {his|her} scroll.
 ```
 **WARNING**:  
 Do not compare the inventories of architects, builders, or janitors.
