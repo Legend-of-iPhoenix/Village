@@ -15,7 +15,7 @@ Tell <villager> to clear {his|her} scroll.
 Tell <villager> to trade scrolls with <other villager>.
 Tell <villager> to write the <nth> letter on {his|her} scroll.
 ```
-**WARNING**:  
+**WARNING**: 
 Do not compare the inventories of architects, builders, or janitors.
 ### Occupation-specific
 (format: `<occupation name>: <command>`, some occupations may have two or more occupation-specific commands)
@@ -72,4 +72,48 @@ janitor: clean the Community Message Board
 farmer: {cultivate|grow|harvest|farm} wheat
 ```
 ## Ask
-to-do
+Lets you "ask" villagers certain questions and do different actions based on their response.
+
+### Syntax
+#### `if...then` case. 
+*(Check if condition is true. If it is, execute `<tasks>`, otherwise, skip to the end of the `Ask` block and continue)*
+```
+Ask <villager> if <question>.
+- If {he|she|it} {does|is}:
+ + <tasks>
+```
+
+#### `if not...then` case. 
+*(Check if condition is false. If it is, execute `<tasks>`, otherwise, skip to the end of the `Ask` block and continue)*
+```
+Ask <villager> if <question>.
+- If {he|she|it} {doesn't|isn't}:
+ + <tasks>
+```
+
+#### `if...then...else` case. 
+*(Check if condition is true. If it is, execute `<tasks if true>`, otherwise execute `<tasks if false>`)*
+```
+Ask <villager> if <question>.
+- If {he|she|it} {does|is}:
+ + <tasks if true>
+- If {he|she|it} {doesn't|isn't}:
+ + <tasks if false>
+```
+
+Note that with the `if...then...else` case, only one case is executed. The `if` blocks can be placed in any order within an `ask` statement. Nesting of `Ask` statements is allowed, and you can safely `Skip` to outside of the conditional.
+
+The `Ask` block afterwards requires indentation, as described [here](https://github.com/Legend-of-iPhoenix/Village/blob/master/docs/syntax.md).
+
+### Questions
+```
+{he|she} has {<number>|any} <item>
+the text on {his|her} scroll {starts with|ends with|contains} "<text>"
+{he|she} has {more|less} <item> than <villager>
+{he|she} is {a|an} <occupation>
+```
+
+## If
+This sub-command of `Ask` defines sections of tasks to be executed if a condition is met or not.
+
+It requires one additional level of indentation.
