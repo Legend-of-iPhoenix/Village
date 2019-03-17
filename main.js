@@ -756,7 +756,7 @@ function run() {
                     var amount = data[0];
                     if (villager.specialItem == null) {
                       villager.specialItem = new Item(villager.specialItemType, amount);
-                      logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". villager is all of the " + villager.specialItemType + " " + villager.genderPronoun2 + " has.");
+                      logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". This is all of the " + villager.specialItemType + " " + villager.genderPronoun2 + " has.");
                     } else {
                       villager.specialItem.quantity += amount;
                       logToConsole(villager.name + " has finished collecting " + amount + " " + villager.specialItemType + ". They now have " + villager.specialItem.quantity + ' ' + villager.specialItemType + ".");
