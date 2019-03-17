@@ -483,7 +483,7 @@ var generalActions = [
         if (Object.keys(specialOccupations).indexOf(villager.occupation) == -1) {
           if (villager.cooldown == 0) {
             if (matches[3].toLowerCase() == villager.specialItemType) {
-              var amount = this.specialItem.quantity * (matches[1] == 'triple' ? 2 : 1);
+              var amount = villager.specialItem.quantity * (matches[1] == 'triple' ? 2 : 1);
               villager.ontaskcompletion = {
                 data: [amount],
                 callback: function (data, villager) {
